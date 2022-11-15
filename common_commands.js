@@ -2,6 +2,7 @@ const commands = `
 /start - Перезапустить бота
 /help - Помощь
 /stat - Статистика
+/random - Случайный человек
 `;
 
 const text1 = 'Lorem ipsum dolor sit amet, consectetur adipisicing elit. Dolore, natus.';

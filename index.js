@@ -1,6 +1,7 @@
 const { Telegraf, Markup } = require('telegraf');
 require('dotenv').config();
 const text = require('./common_commands');
+const axios = require('axios');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 bot.start((ctx) =>  {
@@ -25,6 +26,17 @@ bot.command('stat', async (ctx) => {
   }
 
 });
+
+bot.command('random', async (ctx) => {
+  try {
+    const url = 'https://randomuser.me/api/';
+    const { data } = await axios.get(url);
+    ctx.reply(`You get random user: Gender - ${data.results[0].gender}, first name - ${data.results[0].name.first}, last name - ${data.results[0].name.last}, age - ${data.results[0].dob.age}, email - ${data.results[0].email}, ${data.results[0].picture.medium}`);
+  }
+  catch (e) {
+    console.log(e);
+  }
+})
 
 function addActionBot (name, src, text) {
   bot.action(name, async (ctx) => {
