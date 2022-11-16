@@ -3,11 +3,16 @@ require('dotenv').config();
 const text = require('./common_commands');
 const COUNTRY_LIST = require('./constants');
 const axios = require('axios');
+const HOTELS_CODE = [];
+let TIMER_PUSH_HOTEL = Date.now();
+const TIMER = 3 * 60 * 1000;
+
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 bot.start((ctx) =>  {
-  ctx.reply(`Привет ${ctx.message.from.first_name ? ctx.message.from.first_name : 'Незнакомец'}`)
-  console.log(ctx.message)
+  ctx.replyWithHTML(`Добро пожаловать ${ctx.message.from.first_name ? ctx.message.from.first_name : 'Незнакомец'} 🎉🎉🎉 Я тестовый бот\n\n 👇 У меня есть интересные команды, которыми ты можешь воспользоваться: 👇\n ${text.commands}\n 💬 Я пока могу тебе ответить на твоё сообщение только если ты напишешь "Привет" или отправишь мне стикер 💬\n\n ❗️❗️❗️ А также каждые 3 минуты я буду тебе присылать информацию об отелях 😉`);
+  // console.log(ctx.message);
+  checkTimerAlarm(ctx);
 });
 bot.on('sticker', (ctx) => ctx.reply('😉'));
 bot.hears('Привет', (ctx) => ctx.reply(`И тебе привет ${ctx.message.from.first_name ? ctx.message.from.first_name : 'Незнакомец'}`));
@@ -105,6 +110,43 @@ function renderHTML(data, ctx) {
   ctx.replyWithHTML(html);
 }
 
+async function getHotels(ctx) {
+  try {
+    const url = 'https://hotels4.p.rapidapi.com/v2/get-meta-data';
+    const options = {
+      headers: {
+        'X-RapidAPI-Key': 'afb1065580msh14a586629eb87bdp1776bcjsn8e695cc15b53',
+        'X-RapidAPI-Host': 'hotels4.p.rapidapi.com'
+      }
+    };
+   const { data } = await axios.get(url, options);
+   for (let key in data) {
+     if (!HOTELS_CODE.includes(key)) {
+       HOTELS_CODE.push(key);
+       const html = `<b>Hotel information</b>\n Country Code - <b>${data[key].countryCode}</b>\n Time Format - <b>${data[key].timeFormat}</b>\n Web-site - <b>${data[key].supportedLocales[0].appInfoURL}\n</b> Picture - ${data[key].memberDealCardImageUrl ? data[key].memberDealCardImageUrl : ''}`
+       ctx.replyWithHTML(html);
+       return;
+     }
+   }
+  }
+  catch (e) {
+    console.log(e);
+  }
+}
+
+function checkTimerAlarm(ctx) {
+  try {
+    setInterval(async () => {
+      if (Date.now() - TIMER_PUSH_HOTEL >= TIMER) {
+        TIMER_PUSH_HOTEL = Date.now();
+        await getHotels(ctx);
+      }
+    }, 5000)
+  }
+  catch (e) {
+    console.log(e);
+  }
+}
 
 bot.launch();
 
