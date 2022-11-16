@@ -1,4 +1,4 @@
-const COUNTRY_LIST = [
+const COUNTRY_LIST_CODE = [
     'russian+federation',
     'ukraine',
     'United+States',
@@ -7,7 +7,22 @@ const COUNTRY_LIST = [
     'Kyrgyzstan',
     'Tajikistan',
     'Armenia',
-    'Uzbekistan'
+    'Uzbekistan',
+    'none',
 ];
 
-module.exports = COUNTRY_LIST;
+const COUNTRY_LIST_RU = [
+    'Россия',
+    'Украина',
+    'США',
+    'Беларусь',
+    'Казахстан',
+    'Кыргыстан',
+    'Таджикистан',
+    'Армения',
+    'Узбекистан',
+    'none',
+];
+
+module.exports.COUNTRY_LIST_CODE = COUNTRY_LIST_CODE;
+module.exports.COUNTRY_LIST_RU = COUNTRY_LIST_RU;

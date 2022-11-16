@@ -13,20 +13,6 @@ bot.on('sticker', (ctx) => ctx.reply('😉'));
 bot.hears('Привет', (ctx) => ctx.reply(`И тебе привет ${ctx.message.from.first_name ? ctx.message.from.first_name : 'Незнакомец'}`));
 bot.help((ctx) => ctx.reply(text.commands));
 
-// bot.command('stat', async (ctx) => {
-//   try {
-//     await ctx.replyWithHTML('<b>Статистика</b>', Markup.inlineKeyboard(
-//         [
-//           [Markup.button.callback('Игра_1', 'btn_1'), Markup.button.callback('Игра_2', 'btn_2')],
-//           [Markup.button.callback('Игра_3', 'btn_3')]
-//         ]
-//     ));
-//   }
-//   catch (e) {
-//     console.log(e);
-//   }
-// });
-
 bot.command('random', async (ctx) => {
   try {
     const url = 'https://randomuser.me/api/';
@@ -40,12 +26,20 @@ bot.command('random', async (ctx) => {
 
 bot.command('universities', async (ctx) => {
   try {
+    const arr = [];
     await ctx.replyWithHTML('<b>Выберите страну для получения списка топ 5 университетов</b>', Markup.inlineKeyboard(
-        [
-          [Markup.button.callback('Россия', 'btn_0'), Markup.button.callback('Украина', 'btn_1'), Markup.button.callback('США', 'btn_2')],
-          [Markup.button.callback('Беларусь', 'btn_3'), Markup.button.callback('Казахстан', 'btn_4'), Markup.button.callback('Кыргызстан', 'btn_5')],
-          [Markup.button.callback('Таджикистан', 'btn_6'), Markup.button.callback('Армения', 'btn_7'), Markup.button.callback('Узбекистан', 'btn_8')],
-        ]
+        COUNTRY_LIST.COUNTRY_LIST_CODE.map((text,index) => {
+        const arrLocal = [];
+        if (index % 3 !== 0 || index === 0) {
+          arr.push(Markup.button.callback(COUNTRY_LIST.COUNTRY_LIST_RU[index], `btn_${index}`));
+        }
+        if (index % 3 === 0 && index !== 0) {
+          arrLocal.push(...arr);
+          arr.length = 0;
+          arr.push(Markup.button.callback(COUNTRY_LIST.COUNTRY_LIST_RU[index], `btn_${index}`));
+        }
+        return arrLocal;
+      })
     ));
   }
   catch (e) {
@@ -54,56 +48,17 @@ bot.command('universities', async (ctx) => {
 
 });
 
-function addActionBot (name) {
+function addActionBot (name, buttonIndex) {
   bot.action(name, async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      switch (name) {
-        case 'btn_0':
-          await getUniversities(COUNTRY_LIST[0], (data) => {
+      for (const countryName of COUNTRY_LIST.COUNTRY_LIST_CODE) {
+        const index = COUNTRY_LIST.COUNTRY_LIST_CODE.indexOf(countryName);
+        if (buttonIndex === index) {
+          await getUniversities(COUNTRY_LIST.COUNTRY_LIST_CODE[index], (data) => {
             renderHTML(data, ctx);
           });
-        break;
-        case 'btn_1':
-          await getUniversities(COUNTRY_LIST[1], (data) => {
-            renderHTML(data, ctx);
-          });
-        break;
-        case 'btn_2':
-          await getUniversities(COUNTRY_LIST[2], (data) => {
-            renderHTML(data, ctx);
-          });
-        break;
-        case 'btn_3':
-          await getUniversities(COUNTRY_LIST[3], (data) => {
-            renderHTML(data, ctx);
-          });
-        break;
-        case 'btn_4':
-          await getUniversities(COUNTRY_LIST[4], (data) => {
-            renderHTML(data, ctx);
-          });
-        break;
-        case 'btn_5':
-          await getUniversities(COUNTRY_LIST[5], (data) => {
-            renderHTML(data, ctx);
-          });
-        break;
-        case 'btn_6':
-          await getUniversities(COUNTRY_LIST[6], (data) => {
-            renderHTML(data, ctx);
-          });
-        break;
-        case 'btn_7':
-          await getUniversities(COUNTRY_LIST[7], (data) => {
-            renderHTML(data, ctx);
-          });
-        break;
-        case 'btn_8':
-          await getUniversities(COUNTRY_LIST[8], (data) => {
-            renderHTML(data, ctx);
-          });
-        break;
+        }
       }
     }
     catch (e) {
@@ -111,15 +66,18 @@ function addActionBot (name) {
     }
   });
 }
-for (let i = 0; i <= COUNTRY_LIST.length; i++) {
-  addActionBot(`btn_${i}`);
+
+function addListenersForButtons() {
+  for (let i = 0; i <= COUNTRY_LIST.COUNTRY_LIST_CODE.length; i++) {
+    addActionBot(`btn_${i}`, i);
+  }
+
 }
 
-
+addListenersForButtons();
 
 async function getUniversities(countryCode, cb) {
   try {
-    console.log(countryCode);
     const url = `http://universities.hipolabs.com/search?country=${countryCode}`;
     const { data } = await axios.get(url);
     let obj = {};
