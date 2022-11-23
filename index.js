@@ -5,18 +5,22 @@ const DEFAULT_CONSTANTS = require('./constants');
 const axios = require('axios');
 let TIMER_PUSH_GAMES = Date.now();
 const TIMER =  10 * 60 * 1000;
+let timer = null;
+let ctxUsersArr = [];
 
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 bot.start((ctx) =>  {
-  ctx.replyWithHTML(`Добро пожаловать ${ctx.message.from.first_name ? ctx.message.from.first_name : 'Незнакомец'} 👋 Я тестовый бот\n\n 👇 У меня есть интересные команды, которыми ты можешь воспользоваться: 👇\n ${text.commands}\n 💬 Я пока могу тебе ответить на твоё сообщение только если ты напишешь "Привет" или отправишь мне стикер 💬\n\n ❗️❗️❗️ А также каждые 10 минут, я буду тебе присылать информацию об играх, тебе стоит только выбрать 😉`, Markup.inlineKeyboard(
-      [
-        [
-          Markup.button.callback('Подписаться', 'subscibe_btn'),
-          Markup.button.callback('Не подписываться', 'unsubscibe_btn'),
-        ]
-      ]
-  ));
+  ctx.replyWithHTML(`Добро пожаловать ${ctx.message.from.first_name ? ctx.message.from.first_name : 'Незнакомец'} 👋 Я тестовый бот\n\n 👇 У меня есть интересные команды, которыми ты можешь воспользоваться: 👇\n ${text.commands}\n 💬 Я пока могу тебе ответить на твоё сообщение только если ты напишешь "Привет" или отправишь мне стикер 💬\n\n ❗️❗️❗️ А также каждые 10 минут, я буду тебе присылать информацию об играх, тебе стоит только ввести команду /subscribe, чтобы подписаться, но также в любой момент можно и отключить данную функцию и просто ввести /unsubscribe 😉`
+  // Markup.inlineKeyboard(
+  //     [
+  //       [
+  //         Markup.button.callback('Подписаться', 'subscibe_btn'),
+  //         Markup.button.callback('Не подписываться', 'unsubscibe_btn'),
+  //       ]
+  //     ]
+  // )
+);
   addNicknameToGlobal(ctx);
 
 });
@@ -62,7 +66,6 @@ bot.command('universities', async (ctx) => {
 bot.command('subscribe', async (ctx) => {
   try {
    await addSubscribeUser(ctx);
-    ctx.replyWithHTML(`<b>🎊 Вы подписались на уведомления 🎊</b>`);
   }
   catch (e) {
     console.log(e);
@@ -72,7 +75,6 @@ bot.command('subscribe', async (ctx) => {
 bot.command('unsubscribe', async (ctx) => {
   try {
    removeSubscribedUser(ctx);
-   ctx.replyWithHTML(`<b>Вы отписались от уведомлений 😔</b>`);
   }
   catch (e) {
     console.log(e);
@@ -121,10 +123,11 @@ function addActionOnSubscribe (name) {
 
 async function addSubscribeUser(ctx) {
   try {
-    const userId = ctx.update.callback_query ? ctx.update.callback_query.from.id : ctx.update.message.from.id;
+    const userId = ctx.message.from.id;
     if (!DEFAULT_CONSTANTS.SUBSCRIBED_USERS.includes(userId)) {
       DEFAULT_CONSTANTS.SUBSCRIBED_USERS.push(userId);
-      await checkTimerAlarm(ctx);
+      updateCtxUserArr(ctx);
+      ctx.replyWithHTML(`<b>🎊 Вы подписались на уведомления 🎊</b>`);
     }
   }
   catch (e) {
@@ -134,11 +137,14 @@ async function addSubscribeUser(ctx) {
 
 function removeSubscribedUser(ctx) {
   try {
-    const userId = ctx.update.callback_query ? ctx.update.callback_query.from.id : ctx.update.message.from.id;
+    const userId = ctx.message.from.id;
     const index = DEFAULT_CONSTANTS.SUBSCRIBED_USERS.findIndex((val) => val === userId);
     if (index !== -1) {
-      DEFAULT_CONSTANTS.SUBSCRIBED_USERS = DEFAULT_CONSTANTS.SUBSCRIBED_USERS.slice(index, 0);
+      DEFAULT_CONSTANTS.SUBSCRIBED_USERS.splice(index, 1);
+      updateCtxUserArr(ctx);
+      ctx.replyWithHTML(`<b>Вы отписались от уведомлений 😔</b>`);
     }
+
   }
   catch (e) {
     console.log(e);
@@ -169,6 +175,8 @@ function addListenersForButtons() {
 addActionOnSubscribe('subscibe_btn')
 addActionOnUnsubscribe('unsubscibe_btn');
 addListenersForButtons();
+setGamesList();
+checkTimerAlarm();
 
 async function getUniversities(countryCode, cb) {
   try {
@@ -217,19 +225,20 @@ async function setGamesList() {
   }
 }
 
-function renderHTMLGame (ctx) {
+function renderHTMLGame (ctxArr) {
   try {
     const data = DEFAULT_CONSTANTS.GAMES_LIST;
 
     if (DEFAULT_CONSTANTS.GAMES_IDS.length === DEFAULT_CONSTANTS.GAMES_LIST.length) {
       DEFAULT_CONSTANTS.GAMES_IDS.length = 0;
     }
-
     for (let key in data) {
       if (!DEFAULT_CONSTANTS.GAMES_IDS.includes(data[key].id)) {
         DEFAULT_CONSTANTS.GAMES_IDS.push(data[key].id);
-        const html = `<b>Информация об игре:</b>\n Имя: - <b>${data[key].title}</b>\n Жанр - <b>${data[key].genre}</b>\n Платформа - <b>${data[key].platform}</b>\n Разработчик - <b>${data[key].developer}</b>\n Дата релиза - <b>${data[key].release_date}</b>\n Описание - <b>${data[key].short_description}</b>\n ${data[key].game_url}`
-        ctx.replyWithHTML(html);
+        const html = `<b>Информация об игре:</b>\n Имя: - <b>${data[key].title}</b>\n Жанр - <b>${data[key].genre}</b>\n Платформа - <b>${data[key].platform}</b>\n Разработчик - <b>${data[key].developer}</b>\n Дата релиза - <b>${data[key].release_date}</b>\n Описание - <b>${data[key].short_description}</b>\n ${data[key].game_url}`;
+        for (let ctx of ctxArr) {
+          ctx.replyWithHTML(html);
+        }
         return;
       }
     }
@@ -239,14 +248,36 @@ function renderHTMLGame (ctx) {
   }
 }
 
-async function checkTimerAlarm(ctx) {
+function updateCtxUserArr (ctx) {
+  // const userId = ctx.update.callback_query ? ctx.update.callback_query.from.id : ctx.update.message.from.id;
+  const userId = ctx.message.from.id;
+
+  if (DEFAULT_CONSTANTS.SUBSCRIBED_USERS.includes(userId)) {
+    ctxUsersArr.push(ctx);
+  }
+  else {
+    if (!ctx.update.callback_query) {
+      const index = ctxUsersArr.findIndex(ctxVal => ctxVal.message.from.id === ctx.message.from.id);
+      if (index !== -1) {
+        ctxUsersArr.splice(index, 1);
+      }
+    }
+    // else {
+    //   const index = ctxUsersArr.findIndex(ctxVal => ctxVal.update.callback_query.from.id === ctx.update.callback_query.from.id);
+    //   if (index !== -1) {
+    //     ctxUsersArr.splice(index, 1);
+    //   }
+    // }
+
+  }
+}
+
+async function checkTimerAlarm() {
   try {
-    await setGamesList();
-    const userId = ctx.update.callback_query ? ctx.update.callback_query.from.id : ctx.update.message.from.id;
-    setInterval( () => {
-      if (Date.now() - TIMER_PUSH_GAMES >= TIMER && DEFAULT_CONSTANTS.SUBSCRIBED_USERS.includes(userId)) {
+    timer = setInterval( () => {
+      if (Date.now() - TIMER_PUSH_GAMES >= TIMER) {
         TIMER_PUSH_GAMES = Date.now();
-        renderHTMLGame(ctx);
+        renderHTMLGame(ctxUsersArr);
       }
     }, 5000)
   } catch (e) {
