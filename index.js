@@ -1,18 +1,24 @@
 const { Telegraf, Markup } = require('telegraf');
 require('dotenv').config();
 const text = require('./common_commands');
-const COUNTRY_LIST = require('./constants');
+const DEFAULT_CONSTANTS = require('./constants');
 const axios = require('axios');
-const HOTELS_CODE = [];
-let TIMER_PUSH_HOTEL = Date.now();
-const TIMER = 3 * 60 * 1000;
+let TIMER_PUSH_GAMES = Date.now();
+const TIMER =  10 * 60 * 1000;
 
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 bot.start((ctx) =>  {
-  ctx.replyWithHTML(`Добро пожаловать ${ctx.message.from.first_name ? ctx.message.from.first_name : 'Незнакомец'} 🎉🎉🎉 Я тестовый бот\n\n 👇 У меня есть интересные команды, которыми ты можешь воспользоваться: 👇\n ${text.commands}\n 💬 Я пока могу тебе ответить на твоё сообщение только если ты напишешь "Привет" или отправишь мне стикер 💬\n\n ❗️❗️❗️ А также каждые 3 минуты я буду тебе присылать информацию об отелях 😉`);
-  // console.log(ctx.message);
-  checkTimerAlarm(ctx);
+  ctx.replyWithHTML(`Добро пожаловать ${ctx.message.from.first_name ? ctx.message.from.first_name : 'Незнакомец'} 👋 Я тестовый бот\n\n 👇 У меня есть интересные команды, которыми ты можешь воспользоваться: 👇\n ${text.commands}\n 💬 Я пока могу тебе ответить на твоё сообщение только если ты напишешь "Привет" или отправишь мне стикер 💬\n\n ❗️❗️❗️ А также каждые 10 минут, я буду тебе присылать информацию об играх, тебе стоит только выбрать 😉`, Markup.inlineKeyboard(
+      [
+        [
+          Markup.button.callback('Подписаться', 'subscibe_btn'),
+          Markup.button.callback('Не подписываться', 'unsubscibe_btn'),
+        ]
+      ]
+  ));
+  addNicknameToGlobal(ctx);
+
 });
 bot.on('sticker', (ctx) => ctx.reply('😉'));
 bot.hears('Привет', (ctx) => ctx.reply(`И тебе привет ${ctx.message.from.first_name ? ctx.message.from.first_name : 'Незнакомец'}`));
@@ -33,15 +39,15 @@ bot.command('universities', async (ctx) => {
   try {
     const arr = [];
     await ctx.replyWithHTML('<b>Выберите страну для получения списка топ 5 университетов</b>', Markup.inlineKeyboard(
-        COUNTRY_LIST.COUNTRY_LIST_CODE.map((text,index) => {
+        DEFAULT_CONSTANTS.COUNTRY_LIST_CODE.map((text,index) => {
         const arrLocal = [];
         if (index % 3 !== 0 || index === 0) {
-          arr.push(Markup.button.callback(COUNTRY_LIST.COUNTRY_LIST_RU[index], `btn_${index}`));
+          arr.push(Markup.button.callback(DEFAULT_CONSTANTS.COUNTRY_LIST_RU[index], `btn_${index}`));
         }
         if (index % 3 === 0 && index !== 0) {
           arrLocal.push(...arr);
           arr.length = 0;
-          arr.push(Markup.button.callback(COUNTRY_LIST.COUNTRY_LIST_RU[index], `btn_${index}`));
+          arr.push(Markup.button.callback(DEFAULT_CONSTANTS.COUNTRY_LIST_RU[index], `btn_${index}`));
         }
         return arrLocal;
       })
@@ -53,14 +59,42 @@ bot.command('universities', async (ctx) => {
 
 });
 
+bot.command('subscribe', async (ctx) => {
+  try {
+   await addSubscribeUser(ctx);
+    ctx.replyWithHTML(`<b>🎊 Вы подписались на уведомления 🎊</b>`);
+  }
+  catch (e) {
+    console.log(e);
+  }
+});
+
+bot.command('unsubscribe', async (ctx) => {
+  try {
+   removeSubscribedUser(ctx);
+   ctx.replyWithHTML(`<b>Вы отписались от уведомлений 😔</b>`);
+  }
+  catch (e) {
+    console.log(e);
+  }
+});
+
+function addNicknameToGlobal (ctx) {
+  const nickName = ctx.message.from.username;
+  if (!DEFAULT_CONSTANTS.NICKNAME_USERS.includes(nickName)) {
+    DEFAULT_CONSTANTS.NICKNAME_USERS.push(nickName);
+  }
+  console.log(DEFAULT_CONSTANTS.NICKNAME_USERS);
+}
+
 function addActionBot (name, buttonIndex) {
   bot.action(name, async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      for (const countryName of COUNTRY_LIST.COUNTRY_LIST_CODE) {
-        const index = COUNTRY_LIST.COUNTRY_LIST_CODE.indexOf(countryName);
+      for (const countryName of DEFAULT_CONSTANTS.COUNTRY_LIST_CODE) {
+        const index = DEFAULT_CONSTANTS.COUNTRY_LIST_CODE.indexOf(countryName);
         if (buttonIndex === index) {
-          await getUniversities(COUNTRY_LIST.COUNTRY_LIST_CODE[index], (data) => {
+          await getUniversities(DEFAULT_CONSTANTS.COUNTRY_LIST_CODE[index], (data) => {
             renderHTML(data, ctx);
           });
         }
@@ -72,13 +106,68 @@ function addActionBot (name, buttonIndex) {
   });
 }
 
+function addActionOnSubscribe (name) {
+  bot.action(name, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      await addSubscribeUser(ctx);
+      ctx.replyWithHTML(`<b>🎊 Вы подписались на уведомления 🎊</b>`);
+    }
+    catch (e) {
+      console.log(e);
+    }
+  });
+}
+
+async function addSubscribeUser(ctx) {
+  try {
+    const userId = ctx.update.callback_query ? ctx.update.callback_query.from.id : ctx.update.message.from.id;
+    if (!DEFAULT_CONSTANTS.SUBSCRIBED_USERS.includes(userId)) {
+      DEFAULT_CONSTANTS.SUBSCRIBED_USERS.push(userId);
+      await checkTimerAlarm(ctx);
+    }
+  }
+  catch (e) {
+    console.log(e);
+  }
+}
+
+function removeSubscribedUser(ctx) {
+  try {
+    const userId = ctx.update.callback_query ? ctx.update.callback_query.from.id : ctx.update.message.from.id;
+    const index = DEFAULT_CONSTANTS.SUBSCRIBED_USERS.findIndex((val) => val === userId);
+    if (index !== -1) {
+      DEFAULT_CONSTANTS.SUBSCRIBED_USERS = DEFAULT_CONSTANTS.SUBSCRIBED_USERS.slice(index, 0);
+    }
+  }
+  catch (e) {
+    console.log(e);
+  }
+}
+
+function addActionOnUnsubscribe (name) {
+  bot.action(name, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      removeSubscribedUser(ctx);
+      ctx.replyWithHTML(`<b>Вы отписались от уведомлений 😔</b>`);
+    }
+
+    catch (e) {
+      console.log(e);
+    }
+  });
+}
+
 function addListenersForButtons() {
-  for (let i = 0; i <= COUNTRY_LIST.COUNTRY_LIST_CODE.length; i++) {
+  for (let i = 0; i <= DEFAULT_CONSTANTS.COUNTRY_LIST_CODE.length; i++) {
     addActionBot(`btn_${i}`, i);
   }
 
 }
 
+addActionOnSubscribe('subscibe_btn')
+addActionOnUnsubscribe('unsubscibe_btn');
 addListenersForButtons();
 
 async function getUniversities(countryCode, cb) {
@@ -110,40 +199,57 @@ function renderHTML(data, ctx) {
   ctx.replyWithHTML(html);
 }
 
-async function getHotels(ctx) {
+async function setGamesList() {
   try {
-    const url = 'https://hotels4.p.rapidapi.com/v2/get-meta-data';
+    const url = 'https://free-to-play-games-database.p.rapidapi.com/api/games';
     const options = {
       headers: {
         'X-RapidAPI-Key': 'afb1065580msh14a586629eb87bdp1776bcjsn8e695cc15b53',
-        'X-RapidAPI-Host': 'hotels4.p.rapidapi.com'
-      }
+        'X-RapidAPI-Host': 'free-to-play-games-database.p.rapidapi.com'
+      },
+      params: { platform: 'pc' },
     };
    const { data } = await axios.get(url, options);
-   for (let key in data) {
-     if (!HOTELS_CODE.includes(key)) {
-       HOTELS_CODE.push(key);
-       const html = `<b>Hotel information</b>\n Country Code - <b>${data[key].countryCode}</b>\n Time Format - <b>${data[key].timeFormat}</b>\n Web-site - <b>${data[key].supportedLocales[0].appInfoURL}\n</b> Picture - ${data[key].memberDealCardImageUrl ? data[key].memberDealCardImageUrl : ''}`
-       ctx.replyWithHTML(html);
-       return;
-     }
-   }
+   DEFAULT_CONSTANTS.GAMES_LIST.push(...data);
   }
   catch (e) {
     console.log(e);
   }
 }
 
-function checkTimerAlarm(ctx) {
+function renderHTMLGame (ctx) {
   try {
-    setInterval(async () => {
-      if (Date.now() - TIMER_PUSH_HOTEL >= TIMER) {
-        TIMER_PUSH_HOTEL = Date.now();
-        await getHotels(ctx);
+    const data = DEFAULT_CONSTANTS.GAMES_LIST;
+
+    if (DEFAULT_CONSTANTS.GAMES_IDS.length === DEFAULT_CONSTANTS.GAMES_LIST.length) {
+      DEFAULT_CONSTANTS.GAMES_IDS.length = 0;
+    }
+
+    for (let key in data) {
+      if (!DEFAULT_CONSTANTS.GAMES_IDS.includes(data[key].id)) {
+        DEFAULT_CONSTANTS.GAMES_IDS.push(data[key].id);
+        const html = `<b>Информация об игре:</b>\n Имя: - <b>${data[key].title}</b>\n Жанр - <b>${data[key].genre}</b>\n Платформа - <b>${data[key].platform}</b>\n Разработчик - <b>${data[key].developer}</b>\n Дата релиза - <b>${data[key].release_date}</b>\n Описание - <b>${data[key].short_description}</b>\n ${data[key].game_url}`
+        ctx.replyWithHTML(html);
+        return;
       }
-    }, 5000)
+    }
   }
   catch (e) {
+    console.log(e);
+  }
+}
+
+async function checkTimerAlarm(ctx) {
+  try {
+    await setGamesList();
+    const userId = ctx.update.callback_query ? ctx.update.callback_query.from.id : ctx.update.message.from.id;
+    setInterval( () => {
+      if (Date.now() - TIMER_PUSH_GAMES >= TIMER && DEFAULT_CONSTANTS.SUBSCRIBED_USERS.includes(userId)) {
+        TIMER_PUSH_GAMES = Date.now();
+        renderHTMLGame(ctx);
+      }
+    }, 5000)
+  } catch (e) {
     console.log(e);
   }
 }

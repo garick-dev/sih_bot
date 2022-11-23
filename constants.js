@@ -24,5 +24,17 @@ const COUNTRY_LIST_RU = [
     'none',
 ];
 
+const GAMES_LIST = [];
+
+const GAMES_IDS = [];
+
+const SUBSCRIBED_USERS = [];
+
+const NICKNAME_USERS = [];
+
 module.exports.COUNTRY_LIST_CODE = COUNTRY_LIST_CODE;
 module.exports.COUNTRY_LIST_RU = COUNTRY_LIST_RU;
+module.exports.GAMES_LIST = GAMES_LIST;
+module.exports.GAMES_IDS = GAMES_IDS;
+module.exports.SUBSCRIBED_USERS = SUBSCRIBED_USERS;
+module.exports.NICKNAME_USERS = NICKNAME_USERS;
